@@ -297,18 +297,18 @@ int main() {
 			double max_speed = 49.5;
 			if (car_ahead) {
 				// Vehicle ahead is too close
-				// Shift right if the ego vehicle is in the leftmost lane and there is no car to the right
-				if (!car_right && ego_veh_lane < 2) {
-					ego_veh_lane++;
-				} 
-				// Shift left if the ego vehicle is in 
-				else if (!car_left && ego_veh_lane > 0) {
-					// No car to the left AND there is a left lane -> shift left
-					ego_veh_lane--;
-				} else {
-					// Nowhere to shift -> slow down
-					ref_vel -= acc;
-				}
+                // Shift left if the ego vehicle is not in the leftmost lane and there is no car to the left(Prefer Overtaking from the left if safe)
+                if (!car_left && ego_veh_lane > 0) {
+                    ego_veh_lane--;
+                } 
+                // Shift right if there is no car to the right and the ego vehicle is not in the right most lane
+                else if (!car_right && ego_veh_lane < 2) {
+                    ego_veh_lane++;
+                }
+                // Else slow down 
+                else {
+                    ref_vel -= acc;
+                }
 
 			} else {
 				if (ego_veh_lane != 1) {
