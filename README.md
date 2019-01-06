@@ -54,16 +54,6 @@ the path has processed since last time.
 
 ["sensor_fusion"] A 2d vector of cars and then that car's [car's unique ID, car's x position in map coordinates, car's y position in map coordinates, car's x velocity in m/s, car's y velocity in m/s, car's s position in frenet coordinates, car's d position in frenet coordinates. 
 
-## Details
-
-1. The car uses a perfect controller and will visit every (x,y) point it recieves in the list every .02 seconds. The units for the (x,y) points are in meters and the spacing of the points determines the speed of the car. The vector going from a point to the next point in the list dictates the angle of the car. Acceleration both in the tangential and normal directions is measured along with the jerk, the rate of change of total Acceleration. The (x,y) point paths that the planner recieves should not have a total acceleration that goes over 10 m/s^2, also the jerk should not go over 50 m/s^3. (NOTE: As this is BETA, these requirements might change. Also currently jerk is over a .02 second interval, it would probably be better to average total acceleration over 1 second and measure jerk from that.
-
-2. There will be some latency between the simulator running and the path planner returning a path, with optimized code usually its not very long maybe just 1-3 time steps. During this delay the simulator will continue using points that it was last given, because of this its a good idea to store the last points you have used so you can have a smooth transition. previous_path_x, and previous_path_y can be helpful for this transition since they show the last points given to the simulator controller with the processed points already removed. You would either return a path that extends this previous path or make sure to create a new path that has a smooth transition with this last path.
-
-## Tips
-
-A really helpful resource for doing this project and creating smooth trajectories was using http://kluge.in-chemnitz.de/opensource/spline/, the spline function is in a single hearder file is really easy to use.
-
 ---
 
 ## Dependencies
@@ -87,54 +77,62 @@ A really helpful resource for doing this project and creating smooth trajectorie
     git checkout e94b6e1
     ```
 
-## Editor Settings
+# Rubric points
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+## Compilation
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+### The code compiles correctly.
 
-## Code Style
+The code uses cmake to compile, it can be compiled on any system.
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+## Valid trajectories
 
-## Project Instructions and Rubric
+### The car is able to drive at least 4.32 miles without incident.
+The car is able to successfully drive more than 4.32 miles without incident
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+![5 miles](images/5_miles.png)
 
+### The car drives according to the speed limit.
+No speed limit red message was seen.
 
-## Call for IDE Profiles Pull Requests
+### Max Acceleration and Jerk are not Exceeded.
+The car doesn't exceed a total acceleration of 10 m/s^2 or a jerk of 10 m/s^3.
 
-Help your fellow students!
+### Car does not have collisions.
+No collisions.
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
+### The car stays in its lane, except for the time between changing lanes.
+The car stays in its lane most of the time but when it changes lane because of traffic or to return to the center lane.
 
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
+### The car is able to change lanes
+The car change lanes when the there is a slow car in front of it, and it is safe to change lanes (no other cars around) or when it is safe to return the center lane.
 
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
+## Reflection
 
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
+Based on the provided code from the seed project, the path planning algorithms start at [src/main.cpp](./src/main.cpp#L244) line 244 to the line 433. 
 
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
+The code consist of three parts:
 
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+### Prediction [line 250 to line 293](./src/main.cpp#L250)
+This part of the code deal with the telemetry and sensor fusion data. It intents to reason about the environment. In the case, we want to know three aspects of it:
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+- Is there a car too close in front of us.
+- Is there a car to the right of us making a lane change not safe.
+- Is there a car to the left of us making a lane change not safe.
+
+These questions are answered by calculating the lane each other car is and the position it will be at the end of the last plan trajectory. A car is considered "too close" when its distance to our car is less than 30 meters in front or behind us.
+
+### Behavior [line 296 to line 326](./src/main.cpp#L296)
+This part decides what to do:
+  - If we have a car in front of us, do we change lanes?
+  - Do we speed up or slow down?
+
+Based on the prediction of the situation we are in, this code increases the speed, decrease speed, or make a lane change when it is safe. If there is car too close ahead of us, we check if any of the left or right lane change is safely possible, if not we slow down the car. If there is no car in the close gap ahead of us, we check if it is safe to come back to the center lane and also if we are below the maximum speed, we accelerate to the maximum speed.
+
+### Trajectory [line 328 to line 432](./src/main.cpp#L328)
+This code does the calculation of the trajectory based on the speed and lane output from the behavior, car coordinates and past path points.
+
+First, the last two points of the previous trajectory (or the car position if there are no previous trajectory, lines 337 to 366) are used in conjunction three points at a far distance (lines 368 to 371) to initialize the spline calculation (line 394). To make the work less complicated to the spline calculation based on those points, the coordinates are transformed (shift and rotation) to local car coordinates (lines 381 to 388).
+
+In order to ensure more continuity on the trajectory (in addition to adding the last two point of the pass trajectory to the spline adjustment), the pass trajectory points are copied to the new trajectory (lines 400 to 404). The rest of the points are calculated by evaluating the spline and transforming the output coordinates to not local coordinates (lines 423 to 428). We break up spline points so we travel at our desired reference velocity(lines 414 to 416).
 
